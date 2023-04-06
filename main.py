@@ -14,6 +14,11 @@ def absoluteFilePaths(directory: str):
             yield os.path.abspath(os.path.join(dirpath, f))
 
 
+def findSimilarMethods(classes: list[CppHeaderParser.CppClass], current: CppHeaderParser.CppClass):
+    if(len(current.get('inherits')) == 0):
+        return
+    print("Processing methods of "+current.get('name'))
+
 
 def processDir(dirPath: str):
     paths = absoluteFilePaths(dirPath)
@@ -23,12 +28,18 @@ def processDir(dirPath: str):
             if(pathlib.Path(entry).suffix == ".h"):
                 headers.append(CppHeaderParser.CppHeader(entry))
     
+    classes: list[CppHeaderParser.CppClass] = []
+
     for header in headers:
         for cls in header.classes:
-            f_class: CppHeaderParser.CppClass = header.classes.get(cls)
-            print(f_class.values())
+            classes.append(header.classes.get(cls))           
         #m_type = header.parse_method_type()
         #print(m_type)
+
+    #process loaded classes
+
+    for cls in classes: 
+        findSimilarMethods(classes, cls)
 
 
     return
