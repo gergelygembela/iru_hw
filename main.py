@@ -111,7 +111,7 @@ def findSimilarMethodsInClass(parent: CppHeaderParser.CppClass, other: CppHeader
 def findSimilarMethods(classes: list[CppHeaderParser.CppClass], current: CppHeaderParser.CppClass):
     if (len(current.get('inherits')) == 0):
         return
-    print(f"Processing methods of {current.get('name')}")
+    print(f"\nProcessing methods of {current.get('name')}")
 
     # discover parent tree
     parents = discoverParents(current, classes)
@@ -131,7 +131,14 @@ def processDir(dirPath: str):
     for entry in paths:
         if os.path.isfile(entry):
             if (pathlib.Path(entry).suffix == ".h"):
-                headers.append(CppHeaderParser.CppHeader(entry))
+                try:
+                    headers.append(CppHeaderParser.CppHeader(entry))
+                except CppHeaderParser.CppHeaderParser.CppParseError:
+                    print(f'Excluded classes of header {entry} due to a c++ parser error.')
+                except:
+                    print(f'An unknown error occured while parsing header {entry}. Some classes may not get checked.')
+
+
 
     classes: list[CppHeaderParser.CppClass] = []
     for header in headers:
@@ -158,4 +165,4 @@ if __name__ == "__main__":
     if (len(sys.argv) > 1):
         sys.exit(main(sys.argv[1:]))
     else:
-        sys.exit(main(["C:\\Git\\iru_hw\\testlib2"]))
+        sys.exit(main(["C:\\Git\\iru_hw\\testlib"]))
