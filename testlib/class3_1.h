@@ -4,5 +4,5 @@
 
 class class3: public class1{
 public:
-    void do_something(int a) const;
+    void do_something(int a);
 };

@@ -8,21 +8,23 @@ import pathlib
 
 class ResultItem:
     name = 'a'
-    
+
 
 headers: list[CppHeaderParser.CppHeader] = []
 
 runResult: list[ResultItem] = []
 
+warn_noexcept = False
+
 def absoluteFilePaths(directory: str):
-    for dirpath,_,filenames in os.walk(directory):
+    for dirpath, _, filenames in os.walk(directory):
         for f in filenames:
             yield os.path.abspath(os.path.join(dirpath, f))
 
 
-def findMethodsWithName(cls: CppHeaderParser.CppClass, name: str)-> list[CppHeaderParser.CppMethod]:
-    for method in cls.get('methods'):
-        print(method.get())
+# def findMethodsWithName(cls: CppHeaderParser.CppClass, name: str)-> list[CppHeaderParser.CppMethod]:
+#     for method in cls.get('methods'):
+#         print(method.get())
 
 
 def discoverParents(current: CppHeaderParser.CppClass, classes: list[CppHeaderParser.CppClass]) -> list[CppHeaderParser.CppClass]:
@@ -30,41 +32,97 @@ def discoverParents(current: CppHeaderParser.CppClass, classes: list[CppHeaderPa
     for cls in classes:
         for parent in current.get('inherits'):
             if cls.get('name') == parent.get('class'):
-                if cls not in parents: 
+                if cls not in parents:
                     parents.append(cls)
                     parents += discoverParents(cls, classes)
     return parents
 
 
-def compareMethods(lhs: CppHeaderParser.CppMethod, rhs: CppHeaderParser.CppMethod):
+def getFullSignature(cls: CppHeaderParser.CppClass, method: CppHeaderParser.CppMethod)-> str:
+    return f"{cls.get('namespace')}::{cls.get('name')}::{method.get('debug')}"
 
+def getFullSignatureWithFileName(cls: CppHeaderParser.CppClass, method: CppHeaderParser.CppMethod)-> str:
+    res = getFullSignature(cls, method)
+    res += f" at line {method.get('line_number')} in file {method.get('filename')}"
+    return res
+
+def compareParams(lhs: CppHeaderParser.CppMethod, rhs: CppHeaderParser.CppMethod) -> tuple[bool, list[str]]:
+    result: tuple[bool, list[str]] = (False, [])
     
+    lhs_params = lhs.get('parameters')
+    rhs_params = rhs.get('parameters')
+
+    for i, l_param in enumerate(lhs_params):
+        r_param = rhs_params[i]
+        if(l_param.get('type') != r_param.get('type')) and (l_param.get('type').replace('const ','') != r_param.get('type').replace('const ','')):
+            return (True, [])
+        if(l_param.get('constant') != r_param.get('constant')):
+            result[1].append(f"Potential const mismatch at parameter {i} ({r_param.get('name')})")
+        #if(m lhs_params[i])    
+    return result
+
+
+def compareMethods(lhs: CppHeaderParser.CppMethod, rhs: CppHeaderParser.CppMethod, parent: CppHeaderParser.CppClass, other: CppHeaderParser.CppClass):
+    #different return type is enough distinction
+    if (lhs.get('rtnType') != rhs.get('rtnType')):
+        return
+    
+    #so is a different number of parameters
+    if len(lhs.get('parameters')) != len(rhs.get('parameters')):
+        return
+
+    problems: list[str] = []
+    #so are different types of params
+    res = compareParams(lhs, rhs)
+
+    #There were different param types
+    if res[0]:
+        return
+
+    problems+= res[1]
+    
+    if lhs.get('const') != rhs.get('const'):
+        problems.append(f'Methods {getFullSignature(parent, lhs)} and {getFullSignature(other, rhs)} have different const qualifiers.')
+
+    if warn_noexcept and (lhs.get('noexcept') != rhs.get('noexcept')):
+        problems.append(f'Methods {getFullSignature(parent, lhs)} and {getFullSignature(other, rhs)} have different noexcept qualifiers.')
+
+    if(len(problems) > 0):
+        print(f'Summary for {getFullSignatureWithFileName(other, rhs)}:')
+    else:
+        if not other.get('override'):
+            print(f"Method {getFullSignatureWithFileName(other, rhs)} seems to be an override, consider using the 'override' keyword when compiling with std=c++11 or newer.")
+
+    for problem in problems:
+        print(problem)
+
+    # if(lhs.get(''))
+
     return
 
 
-def findSimilarMethodsInClass(cls: CppHeaderParser.CppClass, other: CppHeaderParser.CppMethod):
-    for method in cls.get('methods').get('public'):
-        if(method.get('name') == other.get('name')):
-            compareMethods(method, other)
+def findSimilarMethodsInClass(parent: CppHeaderParser.CppClass, other: CppHeaderParser.CppMethod, other_cls: CppHeaderParser.CppClass):
+    for method in parent.get('methods').get('public'):
+        if method.get('name') == other.get('name'):
+            compareMethods(method, other, parent, other_cls)
     return
 
 
 def findSimilarMethods(classes: list[CppHeaderParser.CppClass], current: CppHeaderParser.CppClass):
-    if(len(current.get('inherits')) == 0):
+    if (len(current.get('inherits')) == 0):
         return
-    print("Processing methods of "+current.get('name'))
-    
-    #discover parent tree
+    print(f"Processing methods of {current.get('name')}")
+
+    # discover parent tree
     parents = discoverParents(current, classes)
- 
+
     for method in current.get('methods').get('public'):
         for cls in parents:
-            findSimilarMethodsInClass(cls, method)
+            findSimilarMethodsInClass(cls, method, current)
 
     for method in current.get('methods').get('protected'):
         for cls in parents:
-            findSimilarMethodsInClass(cls, method)
-
+            findSimilarMethodsInClass(cls, method, current)
 
 
 def processDir(dirPath: str):
@@ -72,37 +130,32 @@ def processDir(dirPath: str):
 
     for entry in paths:
         if os.path.isfile(entry):
-            if(pathlib.Path(entry).suffix == ".h"):
+            if (pathlib.Path(entry).suffix == ".h"):
                 headers.append(CppHeaderParser.CppHeader(entry))
-    
-
 
     classes: list[CppHeaderParser.CppClass] = []
-
     for header in headers:
         for cls in header.classes:
-            classes.append(header.classes.get(cls))           
-        #m_type = header.parse_method_type()
-        #print(m_type)
+            classes.append(header.classes.get(cls))
 
-    #process loaded classes
-
-    for cls in classes: 
+    # process loaded classes
+    for cls in classes:
         findSimilarMethods(classes, cls)
 
-
     return
+
 
 def main(argv):
     in_path: str = argv[0]
-    print("Processing files in directory " + in_path)
+    print(f'Processing files in directory {in_path}')
 
-    processDir(in_path)    
+    processDir(in_path)
 
     return
 
+
 if __name__ == "__main__":
-    if(len(sys.argv) > 1):
+    if (len(sys.argv) > 1):
         sys.exit(main(sys.argv[1:]))
     else:
-        sys.exit(main(["C:\\Git\\iru_hw\\testlib"]))
+        sys.exit(main(["C:\\Git\\iru_hw\\testlib2"]))
