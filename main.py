@@ -1,18 +1,10 @@
-
 import os
+import pathlib
 import sys
+
 import CppHeaderParser
 
-import pathlib
-
-
-class ResultItem:
-    name = 'a'
-
-
 headers: list[CppHeaderParser.CppHeader] = []
-
-runResult: list[ResultItem] = []
 
 warn_noexcept = False
 
@@ -20,12 +12,6 @@ def absoluteFilePaths(directory: str):
     for dirpath, _, filenames in os.walk(directory):
         for f in filenames:
             yield os.path.abspath(os.path.join(dirpath, f))
-
-
-# def findMethodsWithName(cls: CppHeaderParser.CppClass, name: str)-> list[CppHeaderParser.CppMethod]:
-#     for method in cls.get('methods'):
-#         print(method.get())
-
 
 def discoverParents(current: CppHeaderParser.CppClass, classes: list[CppHeaderParser.CppClass]) -> list[CppHeaderParser.CppClass]:
     parents: list[CppHeaderParser.CppClass] = []
@@ -84,6 +70,9 @@ def compareMethods(lhs: CppHeaderParser.CppMethod, rhs: CppHeaderParser.CppMetho
     if lhs.get('const') != rhs.get('const'):
         problems.append(f'Methods {getFullSignature(parent, lhs)} and {getFullSignature(other, rhs)} have different const qualifiers.')
 
+    if not lhs.get('virtual'):
+        problems.append(f'Method {getFullSignature(parent, lhs)} is not marked virtual.')
+
     if warn_noexcept and (lhs.get('noexcept') != rhs.get('noexcept')):
         problems.append(f'Methods {getFullSignature(parent, lhs)} and {getFullSignature(other, rhs)} have different noexcept qualifiers.')
 
@@ -95,8 +84,6 @@ def compareMethods(lhs: CppHeaderParser.CppMethod, rhs: CppHeaderParser.CppMetho
 
     for problem in problems:
         print(problem)
-
-    # if(lhs.get(''))
 
     return
 
@@ -138,8 +125,6 @@ def processDir(dirPath: str):
                 except:
                     print(f'An unknown error occured while parsing header {entry}. Some classes may not get checked.')
 
-
-
     classes: list[CppHeaderParser.CppClass] = []
     for header in headers:
         for cls in header.classes:
@@ -149,20 +134,14 @@ def processDir(dirPath: str):
     for cls in classes:
         findSimilarMethods(classes, cls)
 
-    return
-
 
 def main(argv):
     in_path: str = argv[0]
     print(f'Processing files in directory {in_path}')
-
     processDir(in_path)
-
-    return
-
 
 if __name__ == "__main__":
     if (len(sys.argv) > 1):
         sys.exit(main(sys.argv[1:]))
     else:
-        sys.exit(main(["C:\\Git\\iru_hw\\testlib"]))
+        sys.exit(main(["./testlib"])) #received no library path

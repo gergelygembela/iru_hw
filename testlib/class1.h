@@ -3,5 +3,5 @@
 
 class class1{
 public:
-    void do_something(int a) const;
+    virtual void do_something(int a) const;
 };

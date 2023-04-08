@@ -1,0 +1,1 @@
+g++ -c -o lib module.cpp
