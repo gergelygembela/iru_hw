@@ -5,9 +5,11 @@ The script runs on Python 3.9 and newer Python versions.
 It depends on pip-package [`robotpy-cppheaderparser`](https://github.com/robotpy/robotpy-cppheaderparser), to install it, run:
 ```pip install robotpy-cppheaderparser```
 
-With the dependency installed, the script is to be run with an argument specifying the path of a library to be analyzed (e.g. `python main.py "./testlib"`).
+With the dependency installed, the script is to be run with an argument specifying the path of a library to be analyzed (e.g. `python ggvirtuals.py "./testlib"`).
 
 If no path is specified, the script attempts to run using the test library provided.
+
+The program checks the methods of all parent classes, and informs the user it it finds methods that may unintentionally be incompatible.
 
 The program outputs a summary for all methods with problems. When the output consists of lines like `Processing methods of <classname>` but no errors are displayed, the program found none.
 
